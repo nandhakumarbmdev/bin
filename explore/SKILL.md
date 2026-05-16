@@ -1,5 +1,5 @@
 ---
-name: explain
+name: explore
 description: >
   Explain code, config, or any project file in plain English for someone who is smart but
   new to this specific codebase. Use this skill whenever the user asks to explain, walk
