@@ -9,6 +9,8 @@ if [ -z "$COMMIT_MESSAGE" ]; then
   exit 1
 fi
 
+CURRENT_BRANCH=$(git branch --show-current)
+
 git add --all
 
 git diff --cached --quiet && {
@@ -18,4 +20,4 @@ git diff --cached --quiet && {
 
 git commit -m "$COMMIT_MESSAGE"
 
-git push
+git push -u origin "$CURRENT_BRANCH"
