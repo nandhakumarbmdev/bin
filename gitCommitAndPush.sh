@@ -21,7 +21,17 @@ if [ "$CONFIRM" != "y" ]; then
   exit 1
 fi
 
-CURRENT_BRANCH=$(git branch --show-current)
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+if [ -z "$CURRENT_BRANCH" ]; then
+  echo "Unable to detect current branch"
+  exit 1
+fi
+
+if [ "$CURRENT_BRANCH" = "master" ]; then
+  echo "Direct push to master is not allowed"
+  exit 1
+fi
 
 git add --all
 
@@ -33,3 +43,5 @@ fi
 git commit -m "$COMMIT_MESSAGE"
 
 git push -u origin "$CURRENT_BRANCH"
+
+echo "Code pushed successfully to $CURRENT_BRANCH"
