@@ -1,201 +1,182 @@
 ---
 name: explore
-description: >
-  Explain code, config, or any project file in plain English for someone who is smart but
-  new to this specific codebase. Use this skill whenever the user asks to explain, walk
-  through, break down, or understand anything in the project — file paths, pasted code,
-  config files, or vague questions like "how does X work?". Trigger even without /explain:
-  phrases like "what does this do", "help me understand this file", "walk me through this",
-  "why is this here", or "I don't get how X works" all warrant this skill. Also trigger for
-  config files: Dockerfiles, tsconfig, yaml, env files, and similar.
+description: Structured, detailed exploration of any codebase component — screens, APIs, modules, data flows, or systems. Outputs visual layout, user actions, full request/response cycles, concurrent operations, and persistence patterns. Use when the user says "explore", "walk me through", "explain how X works end to end", "show me the flow of", or wants a detailed structured walkthrough of any part of the codebase.
+allowed-tools: ["Grep", "Glob", "Read", "Agent"]
 ---
 
-# /explain — Code Explanation Skill
+# Structured Codebase Explorer
 
----
+Perform a detailed, structured exploration of any codebase component and produce a comprehensive walkthrough. Works with any language or framework. Follows a systematic process to trace every user action through the full stack.
 
-## Step 0 — Read the invocation, determine three things
+## Usage
 
-Before writing anything, answer these:
+When the user invokes `/explore`:
 
-**1. What is the input?**
+**Mode selection:**
+- `/explore <target>` — **full** mode (default). Complete structured walkthrough with all sections.
+- `/explore quick <target>` — **quick** mode. Summary only — key files, main flow, no ASCII diagrams.
+- `/explore screen <screen_name>` — **screen** mode. Frontend screen walkthrough with layout, actions, data flows.
+- `/explore api <endpoint>` — **api** mode. Backend API deep dive — handler, middleware, DB queries, response shape.
+- `/explore flow <process>` — **flow** mode. End-to-end data flow tracing — from trigger to persistence.
 
-| Input | What to do |
-|---|---|
-| File path given | Read the file first. If it doesn't exist or can't be read, say so clearly and ask the user to confirm the path. Never guess the content. |
-| File path + `section:name` | Read the full file, locate that function/class/block, explain only that. |
-| File path + `line X-Y` | Read the full file for context, explain only lines X–Y. Pull in enough surrounding lines to make the logic coherent — typically 5–10 lines above and below. |
-| Pasted code | Work from what was pasted. If it references imports or types not included, note what's missing and explain what can be inferred. |
-| Vague question ("how does auth work?") | Don't guess. Ask which file or function to start from, or search for the relevant entry point first. |
+The target can be:
+- A screen/page: `/explore screen login`, `/explore agent list page`
+- An API endpoint: `/explore api POST /api/agents`, `/explore GET /api/usage`
+- A process/flow: `/explore flow message sending`, `/explore token usage tracking`
+- A module/feature: `/explore chart system`, `/explore file explorer`
+- A general area: `/explore frontend architecture`, `/explore auth system`
 
-**2. What is the mode?**
+## Process
 
-| Invocation | Mode |
-|---|---|
-| `/explain src/file.ts` | **Full** |
-| `/explain src/file.ts section:functionName` | **Section** |
-| `/explain src/file.ts line 40-60` | **Lines** |
-| `/explain src/file.ts simple` | **Simple** |
-| Pasted code, short (under ~80 lines) | **Full** |
-| Pasted code, long (over ~80 lines) | Explain top-level structure, ask which part to go deeper on |
+Follow these steps strictly. Each step uses real code — never guess or fabricate.
 
-**File over ~200 lines, no section specified?** Don't explain everything. Explain the
-top-level structure — what the file's job is, its main exports/classes/functions — then ask
-which part to go deeper on.
+### Step 1: Identify scope and locate entry points
 
-**3. What kind of file is it?**
+- If the target is a **screen/page**: Use Grep to find the route definition, then locate the page component
+- If the target is an **API endpoint**: Use Grep to find the route handler in backend routing files
+- If the target is a **process/flow**: Use Grep to find the trigger point (user action, WS event, scheduled job)
+- If the target is a **module/feature**: Use Glob to find all files in the module directory, Grep for key exports
 
-- **Code file** (.ts, .dart, .py, .go, etc.) → use the full explanation flow below
-- **Config file** (.yml, .json, Dockerfile, .env, tsconfig, etc.) → use the Config flow below
-- **Unsure** → read the file first, then decide
+Record every file path found — these will be read in subsequent steps.
 
----
+### Step 2: Read the entry point(s)
 
-## Step 1 — Read before writing anything
+- Read the main handler/component source code using the Read tool
+- Note the exact file path and line numbers
+- Identify all child components, imported services, and called functions
 
-- Read the file or section completely before forming an explanation.
-- Then check the immediate context: imports, types, interfaces, and configs this file depends
-  on. A function makes more sense when you know who calls it and why.
-- To find callers ("what depends on this"): search the codebase for the function/class name
-  using grep or a file search. Don't guess or skip this — if a search isn't possible, say so.
-- Only start writing after you understand *why* this code exists, not just what it does.
+### Step 3: Trace the full call chain
 
----
+For each action/interaction found in Step 2:
 
-## Step 2 — Calibrate to the reader
+1. **Trace forward** — for every function call, use Grep to find its definition, then Read it
+2. **Trace the data** — follow the data from input to output: what transformations happen, what gets persisted
+3. **Trace the response** — follow the return path back to the user
+4. **Maximum depth: 4 levels** — beyond that, summarize the sub-function in one line
+5. **Use parallel Agent calls** when tracing multiple independent paths (e.g., frontend + backend simultaneously)
 
-Before explaining, read the conversation for signals about who this person is:
+### Step 4: Identify concurrent operations
 
-- **New to the codebase**: explain the why behind decisions, not just the what. Use analogies.
-- **Senior / quick refresher**: skip the obvious, focus on non-obvious design choices and
-  tradeoffs. Lead with the summary, go deep only where complexity warrants it.
-- **No signal**: default to "smart but new to this codebase." They know the language; they
-  don't know why this file exists or how it fits.
+- Look for simultaneous event streams (WebSocket events, parallel API calls, background jobs)
+- Note what updates happen independently of the main flow
+- Identify any polling, intervals, or real-time subscriptions
 
----
+### Step 5: Map persistence
 
-## Step 3 — Full mode explanation (code files)
+- What gets written to disk/DB? Where? In what format?
+- What gets read? From where?
+- Are there caches? How are they invalidated?
 
-Work through these sections in order. Skip any that genuinely add no value for this specific
-code — a simple pure function doesn't need edge cases or a flow diagram. Use judgment, but
-don't skip complex parts just because they're "standard."
+### Step 6: Produce structured output
 
-### One sentence
-What does this code do? No jargon, no backstory. The job in one sentence.
-
-### The big picture
-Show how data or control moves through this code.
-
-- **Data transformation or multi-system coordination**: draw an ASCII flow diagram built from
-  the actual code. Show real function names, real branch conditions, real outputs. Don't use
-  a generic shape.
-- **UI component**: describe the render lifecycle — what triggers a re-render, what state it
-  owns, what it emits.
-- **Event handler / callback**: describe what fires it, what it does, what it produces or
-  mutates.
-- **Simple getter or pure utility**: skip the diagram. The one-sentence summary is enough
-  for the big picture.
-
-### Terms to know first
-Only define terms that are project-specific or used in a non-obvious way. Skip anything the
-reader already knows from the language or common libraries. One line per term. If there are
-none, skip this section entirely.
-
-### Section by section
-Group related lines into logical sections. For each section:
-- Show the relevant lines with line numbers
-- What it does in plain English
-- Why it exists — what breaks or goes wrong without it
-
-When a section contains branches (`if`, `switch`, `try/catch`, ternary): explain them inline
-here, not in a separate pass. For each branch:
-- What condition triggers it?
-- What happens when taken?
-- What happens when NOT taken?
-- Why does this branch exist?
-
-Don't cover branches separately AND in the section breakdown — pick one place and be
-complete there.
-
-### Data at each stage
-Only for code that transforms data. Show what the data looks like before and after each
-meaningful step. Use the actual field names and types from the code.
-
-### Edge cases
-What happens when things go wrong? Only mention edge cases the code actually handles or
-visibly ignores — don't invent scenarios. Empty inputs, nulls, failures, missing config,
-concurrent calls.
-
-### What depends on this
-Search for callers. List the files or functions that call this code and what they expect from
-it. Keep it to a short list. If nothing calls it directly (it's an entry point or exported
-public API), say that explicitly.
+Produce the exploration result using this template:
 
 ---
 
-## Step 4 — Section mode
+#### Section 1: Visual Layout (for screens/frontend only)
 
-Read the full file, find the named function/class/block. Explain only that, using the same
-section-by-section structure above. Additionally:
-- Show who calls this section and with what arguments (search for callers)
-- Show what this section calls and why
+```
+┌──────────────────────────────────────┐
+│  Header / Title bar                  │
+├──────────┬───────────────────────────┤
+│          │                           │
+│  Sidebar │  Main content area        │
+│          │                           │
+│          │  ┌───────────────────┐    │
+│          │  │  Component        │    │
+│          │  └───────────────────┘    │
+│          │                           │
+├──────────┴───────────────────────────┤
+│  Footer / Input area                 │
+└──────────────────────────────────────┘
+```
+
+Describe what the user sees — layout, buttons, cards, input fields, status indicators. Be specific about text labels, colors, and arrangement.
+
+#### Section 2: User Actions and Data Flows
+
+For every user action, produce a numbered trace:
+
+```
+Frontend                    Backend                     DB/Disk
+────────                    ──────                     ────────
+
+1. User clicks X
+2. Component handler
+   calls API
+   POST /api/thing       ──► 3. Route handler
+                              4. Validation
+                              5. Service call
+                              6. DB write             ──► INSERT INTO table
+   ◄── { response }      ◄── 7. Return result
+
+8. UI updates with response
+```
+
+Each trace must include:
+- **What triggers it** (user click, timer, WS event)
+- **What API/WS call is made** (exact endpoint, method, payload shape)
+- **What the backend does** (validation, business logic, persistence)
+- **What gets written** (DB tables, files, cache)
+- **What response comes back** (exact response shape)
+- **How the UI updates** (state change, re-render)
+
+#### Section 3: Concurrent Operations
+
+List what happens simultaneously during normal operation:
+
+```
+Timeline:
+─────────────────────────────────────────────────────
+  T+0s   Action A triggered
+  T+0.1s Action B starts (parallel)
+  T+1s   Event stream X updates UI
+  T+2s   Background job Y completes
+─────────────────────────────────────────────────────
+```
+
+#### Section 4: Persistence Map
+
+| What | Where | Format | When |
+|------|-------|--------|------|
+| Data A | path/to/file.db | SQLite table | On every write |
+| Data B | path/to/file.json | JSON | On config change |
+
+#### Section 5: Error Handling
+
+| Scenario | What happens | User sees |
+|----------|-------------|-----------|
+| Network failure | Retry / reconnect | Error toast |
+| Validation fail | 400 response | Inline error |
+
+#### Section 6: File Map
+
+```
+path/to/file_a.ts — Main page component (lines X–Y)
+path/to/file_b.ts — API route handler (lines X–Y)
+path/to/file_c.ts — Service/business logic (lines X–Y)
+path/to/file_d.ts — DB/storage layer (lines X–Y)
+path/to/file_e.ts — Types and interfaces (lines X–Y)
+```
 
 ---
 
-## Step 5 — Lines mode
+## Quick Mode
 
-Read the full file for context. Explain only the specified lines, but:
-- Pull in enough surrounding lines (typically 5–10 above and below) to make the logic
-  coherent
-- State explicitly what is happening just before line X and just after line Y, so the
-  explained block isn't floating in a vacuum
+When invoked with `quick`:
+- Skip ASCII diagrams and detailed traces
+- Output only: key files, main flow summary (5-10 lines), data persistence summary, and 2-3 key observations
+- Maximum 100 lines of output
 
-Use section-by-section structure scaled to the line count. A 20-line block doesn't need
-every subsection — just what's relevant.
+## Critical Rules
 
----
-
-## Step 6 — Simple mode
-
-Only produce:
-1. One sentence — what this code does
-2. Big picture — diagram or lifecycle, whichever fits
-3. Three sentences — the most important thing to understand about how it works
-
-Nothing else.
-
----
-
-## Step 7 — Config file flow
-
-For non-code files (Dockerfile, docker-compose.yml, tsconfig.json, .env.example,
-nginx.conf, and similar):
-
-- **One sentence**: what this config controls
-- **Key by key** (or block by block for yaml/docker): for each non-obvious entry, explain
-  what it does and why it's set the way it is. Skip entries that are self-explanatory.
-- **What breaks if this is wrong**: the most likely misconfiguration and its symptom
-- **How it connects**: what reads this config and when
-
-Don't use a flow diagram for config files. Don't apply code-explanation sections.
-
----
-
-## Closing
-
-After every explanation, invite the next question naturally — match the tone of the
-conversation. Point toward what makes sense to ask next: a specific function, a line range,
-how it connects to another part of the system. Don't use a fixed script.
-
----
-
-## What NOT to do
-
-- Don't explain syntax the reader already knows from the language.
-- Don't explain obvious code. A simple getter needs no explanation.
-- Don't suggest code changes or add comments. This is explanation only.
-- Don't skip complex parts because they're "standard" or "boilerplate."
-- Don't use the phrase "as you can see."
-- Don't explain branches in two places — pick section-by-section and be complete there.
-- Don't guess file content if the file can't be read. Say so and ask.
-- Don't invent callers or dependencies. Search first; if search isn't possible, say so.
+1. **NEVER guess code.** Every file path, line number, function signature, and response shape must come from actually reading the code with the Read/Grep tools.
+2. **NEVER fabricate data flows.** If you can't trace a path fully, say "untraceable from here" rather than making up the next step.
+3. **Read before describing.** Read the actual component/handler before describing what it does or what the UI looks like.
+4. **Use parallel exploration.** When tracing both frontend and backend for the same feature, launch Agent calls in parallel for speed.
+5. **Be exhaustive on actions.** Every button, input, dropdown, and interaction on a screen must be covered — don't skip "minor" actions.
+6. **Show real payload shapes.** Use actual JSON shapes from the code (request bodies, response objects, event payloads), not approximations.
+7. **Include line numbers.** Every file reference should include line numbers from actual reads.
+8. **Respect scope.** If the user asked about one screen, don't wander into related screens unless the flow naturally crosses boundaries.
+9. **No filler.** Don't add preamble like "Here's the exploration..." or "Based on my analysis...". Start directly with the structured output.
+10. **Adapt to language.** The skill works with any language/framework — detect from the code, don't assume TypeScript/React.
