@@ -5,6 +5,7 @@ BASE_DIR="/Users/nandha/workspace/flutter/baseui"
 PROJECT_DIR="$BASE_DIR/fleettrack"
 
 if [ "$PWD" = "$BASE_DIR" ]; then
+  PORT=8081
   cd "$PROJECT_DIR" || exit 1
 fi
 
